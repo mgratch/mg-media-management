@@ -3,8 +3,8 @@
   "description": "Leverages local media when available, otherwise falls back to a specified production server. This works with Multisite / Subdirectory installs.",
   "type": "wordpress-plugin",
   "require": {
-    "php": ">=7.2",
-    "composer/installers": "~1.0"
+    "php": ">=8.0",
+    "composer/installers": ">=1.0 <3.0"
   },
   "authors": [
     {
