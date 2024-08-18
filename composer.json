@@ -24,5 +24,10 @@
   },
   "extra": {
     "installer-name": "mg-media-management"
+  },
+  "config": {
+    "allow-plugins": {
+      "composer/installers": true
+    }
   }
 }
