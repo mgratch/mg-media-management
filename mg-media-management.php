@@ -251,7 +251,7 @@ class MG_Media_Management {
 	 */
 	protected function replace_url_with_production( string $url ): string {
 		$production_url = $this->get_production_url();
-		return empty( $production_url ) ? $url : str_replace( trailingslashit( home_url() ), trailingslashit( $production_url ), $url );
+		return empty( $production_url ) ? $url : str_replace( trailingslashit( network_home_url() ), trailingslashit( $production_url ), $url );
 	}
 
 	/**
