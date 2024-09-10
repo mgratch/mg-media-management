@@ -5,7 +5,7 @@
  * Description: Leverages local media when available, otherwise falls back to a specified production server.
  * Author: Marc Gratch
  * Author URI: https://marcgratch.com
- * Version: 1.0.0
+ * Version: 1.0.2
  * Text Domain: mg-media-management
  * Domain Path: /languages
  *
@@ -66,11 +66,17 @@ class MG_Media_Management {
 	/**
 	 * Modify the main image source URL.
 	 *
-	 * @param array $image The image source URL.
+	 * @param mixed $image The image source URL.
 	 *
 	 * @return array
 	 */
-	public function modify_image_src( array $image ): array {
+	public function modify_image_src( $image ) {
+		if ( ! is_array( $image ) ) {
+			$image_str = $image;
+			$image     = array();
+			$image[]   = $image_str;
+		}
+
 		if ( isset( $image[0] ) ) {
 			$image[0] = $this->get_remote_or_local_url( $image[0] );
 		}
