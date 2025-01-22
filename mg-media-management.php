@@ -5,7 +5,7 @@
  * Description: Leverages local media when available, otherwise falls back to a specified production server.
  * Author: Marc Gratch
  * Author URI: https://marcgratch.com
- * Version: 1.0.2
+ * Version: 1.0.4
  * Text Domain: mg-media-management
  * Domain Path: /languages
  *
@@ -245,7 +245,20 @@ class MG_Media_Management {
 	 */
 	protected function local_filename( string $url ): string {
 		$upload_locations = wp_upload_dir();
-		return str_replace( $upload_locations['baseurl'], $upload_locations['basedir'], $url );
+		if ( is_multisite() && ! is_subdomain_install() ) {
+			$url = str_replace( trailingslashit( home_url() ), trailingslashit( network_home_url() ), $url );
+		}
+
+		$local_path = str_replace( $upload_locations['baseurl'], $upload_locations['basedir'], $url );
+
+		// If the local path isn't set and it's a multisite, try removing the sites/<id> from the baseurl and basedir.
+		if ( $local_path === $url && is_multisite() && ! is_subdomain_install() ) {
+			$baseurl = str_replace( '/sites/' . get_current_blog_id(), '', $upload_locations['baseurl'] );
+			$basedir = str_replace( '/sites/' . get_current_blog_id(), '', $upload_locations['basedir'] );
+			$local_path = str_replace( $baseurl, $basedir, $url );
+		}
+
+		return $local_path;
 	}
 
 	/**
