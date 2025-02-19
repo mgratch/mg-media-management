@@ -5,7 +5,7 @@
  * Description: Leverages local media when available, otherwise falls back to a specified production server.
  * Author: Marc Gratch
  * Author URI: https://marcgratch.com
- * Version: 1.0.4
+ * Version: 1.0.5
  * Text Domain: mg-media-management
  * Domain Path: /languages
  *
@@ -194,7 +194,7 @@ class MG_Media_Management {
 	private function prepare_url_for_replacement( string $url ): string {
 		if ( is_multisite() && ! is_subdomain_install() ) {
 			$blog_details = get_blog_details( get_current_blog_id() );
-			if ( isset( $blog_details->path ) && ! str_contains( $url, $blog_details->path ) ) {
+			if ( isset( $blog_details->path ) && ! str_contains( $url, $blog_details->path ) && ( untrailingslashit( $url ) !== untrailingslashit( home_url() ) ) ) {
 				return str_replace( trailingslashit( network_home_url() ), trailingslashit( home_url() ), $url );
 			}
 		}
