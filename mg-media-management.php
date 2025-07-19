@@ -5,7 +5,7 @@
  * Description: Leverages local media when available, otherwise falls back to a specified production server.
  * Author: Marc Gratch
  * Author URI: https://marcgratch.com
- * Version: 1.0.5
+ * Version: 1.0.6
  * Text Domain: mg-media-management
  * Domain Path: /languages
  *
@@ -61,6 +61,7 @@ class MG_Media_Management {
 		add_filter( 'the_content', array( $this, 'modify_content_images' ) );
 		add_filter( 'wp_get_attachment_url', array( $this, 'update_image_url' ) );
 		add_filter( 'the_post', array( $this, 'update_post_content' ) );
+		add_filter( 'attachment_url_to_postid', array( $this, 'resolve_attachment_from_production' ), 10, 2 );
 	}
 
 	/**
@@ -274,6 +275,23 @@ class MG_Media_Management {
 	}
 
 	/**
+	 * Replaces a URL with the local URL, removing the production host and path.
+	 *
+	 * @param string $url The image URL to be replaced.
+	 *
+	 * @return string
+	 */
+	protected function replace_url_with_local( string $url ): string {
+		$local_url       = get_site_url();
+		$local_url_parts = wp_parse_url( $local_url );
+		$local_host      = $local_url_parts['host'] ?? '';
+		$local_path      = $local_url_parts['path'] ?? '';
+		$remote_host     = wp_parse_url( $this->get_production_url(), PHP_URL_HOST );
+		$remove_path_url = str_replace( $local_path, '', $url );
+		return str_replace( $remote_host, $local_host, $remove_path_url );
+	}
+
+	/**
 	 * Retrieves the production URL, checking the constant and applying a filter.
 	 *
 	 * @return string
@@ -291,6 +309,30 @@ class MG_Media_Management {
 	 */
 	protected function get_remote_or_local_url( string $url ): string {
 		return $this->local_image_exists( $url ) ? $url : $this->replace_url_with_production( $url );
+	}
+
+	/**
+	 * Attempt to resolve an attachment ID from a production URL.
+	 *
+	 * @param int|null $post_id The post ID to resolve.
+	 * @param null     $url The URL to resolve.
+	 *
+	 * @return int|false
+	 */
+	public function resolve_attachment_from_production( int $post_id = null, $url = null ): false|int {
+		remove_filter( 'attachment_url_to_postid', array( $this, 'resolve_attachment_from_production' ) );
+
+		if ( $post_id ) {
+			return $post_id;
+		}
+
+		$local_url = $this->replace_url_with_local( $url );
+
+		$post_id = attachment_url_to_postid( $local_url );
+
+		add_filter( 'attachment_url_to_postid', array( $this, 'resolve_attachment_from_production' ), 10, 2 );
+
+		return $post_id;
 	}
 }
 
