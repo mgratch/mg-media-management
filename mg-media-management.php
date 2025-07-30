@@ -5,7 +5,7 @@
  * Description: Leverages local media when available, otherwise falls back to a specified production server.
  * Author: Marc Gratch
  * Author URI: https://marcgratch.com
- * Version: 1.0.6
+ * Version: 1.1.0
  * Text Domain: mg-media-management
  * Domain Path: /languages
  *
@@ -62,6 +62,9 @@ class MG_Media_Management {
 		add_filter( 'wp_get_attachment_url', array( $this, 'update_image_url' ) );
 		add_filter( 'the_post', array( $this, 'update_post_content' ) );
 		add_filter( 'attachment_url_to_postid', array( $this, 'resolve_attachment_from_production' ), 10, 2 );
+		add_filter( 'style_loader_tag', array( $this, 'modify_style_loader_tag' ), 20, 4 );
+		add_action( 'template_redirect', array( $this, 'start_output_buffer' ), 0 );
+		add_action( 'shutdown', array( $this, 'end_output_buffer' ), PHP_INT_MAX );
 	}
 
 	/**
@@ -254,8 +257,8 @@ class MG_Media_Management {
 
 		// If the local path isn't set and it's a multisite, try removing the sites/<id> from the baseurl and basedir.
 		if ( $local_path === $url && is_multisite() && ! is_subdomain_install() ) {
-			$baseurl = str_replace( '/sites/' . get_current_blog_id(), '', $upload_locations['baseurl'] );
-			$basedir = str_replace( '/sites/' . get_current_blog_id(), '', $upload_locations['basedir'] );
+			$baseurl    = str_replace( '/sites/' . get_current_blog_id(), '', $upload_locations['baseurl'] );
+			$basedir    = str_replace( '/sites/' . get_current_blog_id(), '', $upload_locations['basedir'] );
 			$local_path = str_replace( $baseurl, $basedir, $url );
 		}
 
@@ -333,6 +336,67 @@ class MG_Media_Management {
 		add_filter( 'attachment_url_to_postid', array( $this, 'resolve_attachment_from_production' ), 10, 2 );
 
 		return $post_id;
+	}
+
+	/**
+	 * Modify enqueued styles to replace URLs in inline stylesheets that may contain background images.
+	 *
+	 * @param string $tag    The `<link>` or `<style>` tag for the enqueued style.
+	 *
+	 * @return string
+	 */
+	public function modify_style_loader_tag( string $tag ): string {
+		// Early return if not a style with inline content.
+		if ( strpos( $tag, '<style' ) === false && strpos( $tag, '<link' ) !== false ) {
+			return $tag;
+		}
+
+		// Replace URLs inside the tag contents (background images, etc.).
+		return preg_replace_callback(
+			'/url\((["\']?)(https?:\/\/[^"\')]+)(["\']?)\)/i',
+			function ( $matches ) {
+				$original_url = $matches[2];
+				$replaced_url = $this->get_remote_or_local_url( $original_url );
+				return 'url(' . $matches[1] . esc_url_raw( $replaced_url ) . $matches[3] . ')';
+			},
+			$tag
+		);
+	}
+
+	/**
+	 * Start output buffering to capture and replace background-image URLs in CSS.
+	 */
+	public function start_output_buffer(): void {
+		if ( ! is_admin() && ! wp_doing_ajax() ) {
+			ob_start( array( $this, 'replace_background_image_urls' ) );
+		}
+	}
+
+	/**
+	 * Flush the output buffer on shutdown.
+	 */
+	public function end_output_buffer(): void {
+		if ( ob_get_level() > 0 ) {
+			ob_end_flush();
+		}
+	}
+
+	/**
+	 * Replace background-image URLs in output buffer.
+	 *
+	 * @param string $html The full page output buffer.
+	 * @return string Modified output with updated URLs.
+	 */
+	public function replace_background_image_urls( string $html ): string {
+		return preg_replace_callback(
+			'/url\((["\']?)(https?:\/\/[^"\')]+)(["\']?)\)/i',
+			function ( $matches ) {
+				$url         = $matches[2];
+				$updated_url = $this->get_remote_or_local_url( $url );
+				return 'url(' . $matches[1] . esc_url_raw( $updated_url ) . $matches[3] . ')';
+			},
+			$html
+		);
 	}
 }
 
