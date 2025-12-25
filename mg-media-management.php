@@ -5,7 +5,7 @@
  * Description: Leverages local media when available, otherwise falls back to a specified production server.
  * Author: Marc Gratch
  * Author URI: https://marcgratch.com
- * Version: 1.1.0
+ * Version: 1.2.0
  * Text Domain: mg-media-management
  * Domain Path: /languages
  *
@@ -262,6 +262,15 @@ class MG_Media_Management {
 			$local_path = str_replace( $baseurl, $basedir, $url );
 		}
 
+		// If still a URL (non-uploads path like themes/plugins), convert content URL to filesystem path.
+		if ( filter_var( $local_path, FILTER_VALIDATE_URL ) ) {
+			$local_path = str_replace(
+				content_url(),
+				WP_CONTENT_DIR,
+				$url
+			);
+		}
+
 		return $local_path;
 	}
 
@@ -339,6 +348,35 @@ class MG_Media_Management {
 	}
 
 	/**
+	 * Escape a URL while preserving basic auth credentials.
+	 *
+	 * @param string $url The URL to escape.
+	 *
+	 * @return string
+	 */
+	protected function esc_url_preserve_auth( string $url ): string {
+		$parts = wp_parse_url( $url );
+
+		// If no user, just use regular escaping.
+		if ( empty( $parts['user'] ) ) {
+			return esc_url_raw( $url );
+		}
+
+		// Build auth string.
+		$auth = rawurlencode( $parts['user'] );
+		if ( ! empty( $parts['pass'] ) ) {
+			$auth .= ':' . rawurlencode( $parts['pass'] );
+		}
+
+		// Remove auth from URL, escape it, then add auth back.
+		$url_without_auth = str_replace( $parts['user'] . ( ! empty( $parts['pass'] ) ? ':' . $parts['pass'] : '' ) . '@', '', $url );
+		$escaped          = esc_url_raw( $url_without_auth );
+
+		// Add auth back after the scheme.
+		return preg_replace( '/^(https?:\/\/)/', '$1' . $auth . '@', $escaped );
+	}
+
+	/**
 	 * Modify enqueued styles to replace URLs in inline stylesheets that may contain background images.
 	 *
 	 * @param string $tag    The `<link>` or `<style>` tag for the enqueued style.
@@ -357,7 +395,7 @@ class MG_Media_Management {
 			function ( $matches ) {
 				$original_url = $matches[2];
 				$replaced_url = $this->get_remote_or_local_url( $original_url );
-				return 'url(' . $matches[1] . esc_url_raw( $replaced_url ) . $matches[3] . ')';
+				return 'url(' . $matches[1] . $this->esc_url_preserve_auth( $replaced_url ) . $matches[3] . ')';
 			},
 			$tag
 		);
@@ -393,7 +431,7 @@ class MG_Media_Management {
 			function ( $matches ) {
 				$url         = $matches[2];
 				$updated_url = $this->get_remote_or_local_url( $url );
-				return 'url(' . $matches[1] . esc_url_raw( $updated_url ) . $matches[3] . ')';
+				return 'url(' . $matches[1] . $this->esc_url_preserve_auth( $updated_url ) . $matches[3] . ')';
 			},
 			$html
 		);
