@@ -3,7 +3,7 @@ Contributors: MarcGratch
 Tags: image, images, media, staging, local, development, multisite
 Requires at least: 4.3
 Tested up to: 6.3
-Stable tag: 1.3.0
+Stable tag: 1.3.1
 
 For developers - Leverages local media when available, otherwise falls back to a specified production server. This plugin works with Multisite / Subdirectory installs.
 
@@ -67,6 +67,10 @@ Set up a "push" profile to push your local database to the development server. E
 Set up a "pull" profile to pull the development database locally. Do not include media in your pull. Missing media will be handled by MG Media Management.
 
 == Changelog ==
+
+= 1.3.1 =
+* Fix: 1.3.0 could blank a page. The attribute pattern used a lazy `.*?` with the `s` flag, which exceeded PCRE's backtrack limit on larger documents. `preg_replace_callback()` returns null on that failure, and because the rewrite runs inside an output buffer, the null was emitted as an empty page.
+* The pattern now uses a negated character class and no longer spans newlines, and both rewrite passes fall back to the untouched markup if `preg_*` fails, so a regex failure can never blank output again.
 
 = 1.3.0 =
 * Fix: hooks are registered on `plugins_loaded` instead of `muplugins_loaded`. The old hook has already fired by the time a plugin in `wp-content/plugins/` loads, so nothing was ever registered unless an mu-plugin included the file manually.

@@ -5,7 +5,7 @@
  * Description: Leverages local media when available, otherwise falls back to a specified production server.
  * Author: Marc Gratch
  * Author URI: https://marcgratch.com
- * Version: 1.3.0
+ * Version: 1.3.1
  * Text Domain: mg-media-management
  * Domain Path: /languages
  *
@@ -427,7 +427,7 @@ class MG_Media_Management {
 	 */
 	public function replace_background_image_urls( string $html ): string {
 		// CSS background-image url() references.
-		$html = preg_replace_callback(
+		$replaced = preg_replace_callback(
 			'/url\((["\']?)(https?:\/\/[^"\')]+)(["\']?)\)/i',
 			function ( $matches ) {
 				$url         = $matches[2];
@@ -437,11 +437,18 @@ class MG_Media_Management {
 			$html
 		);
 
+		// preg_* returns null on failure (backtrack/recursion limits). This runs
+		// inside an output buffer, so returning that null would blank the page.
+		// Degrade to the untouched markup instead.
+		if ( null !== $replaced ) {
+			$html = $replaced;
+		}
+
 		// Markup that writes media URLs straight into attributes instead of going
 		// through the attachment API. Page builders do this constantly, so the
 		// wp_get_attachment_* filters never see those URLs.
-		$html = preg_replace_callback(
-			'/\b(srcset|data-srcset|src|data-src)=(["\'])(.*?)\2/is',
+		$replaced = preg_replace_callback(
+			'/\b(srcset|data-srcset|src|data-src)=(["\'])([^"\']*)\2/i',
 			function ( $matches ) {
 				$attr  = $matches[1];
 				$quote = $matches[2];
@@ -469,6 +476,10 @@ class MG_Media_Management {
 			},
 			$html
 		);
+
+		if ( null !== $replaced ) {
+			$html = $replaced;
+		}
 
 		return $html;
 	}
