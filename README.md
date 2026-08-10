@@ -3,7 +3,7 @@
 Contributors: Marc Gratch  
 Requires at least: 4.3  
 Tested up to: 6.3  
-Stable tag: 1.2.0  
+Stable tag: 1.3.0  
 License: GPLv2 or later  
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -105,6 +105,11 @@ Set up a "push" profile to push your local database to the development server. E
 Set up a "pull" profile to pull the development database locally. Do not include media in your pull. Missing media will be handled by MG Media Management.
 
 ## Changelog
+
+### 1.3.0
+- Fix: hooks are registered on `plugins_loaded` instead of `muplugins_loaded`. The old hook has already fired by the time a plugin in `wp-content/plugins/` loads, so nothing was ever registered unless an mu-plugin included the file manually.
+- `src`, `srcset`, `data-src` and `data-srcset` attributes are now rewritten, not just CSS `url()` references. Page builders write media URLs straight into markup and never touch the attachment API.
+- Attribute rewriting is limited to same-host URLs under the uploads directory that end in a media extension, so scripts and stylesheets served from uploads are left alone.
 
 ### 1.2.0
 - Added support for basic authentication in production URLs

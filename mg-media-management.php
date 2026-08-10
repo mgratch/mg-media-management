@@ -5,7 +5,7 @@
  * Description: Leverages local media when available, otherwise falls back to a specified production server.
  * Author: Marc Gratch
  * Author URI: https://marcgratch.com
- * Version: 1.2.0
+ * Version: 1.3.0
  * Text Domain: mg-media-management
  * Domain Path: /languages
  *
@@ -426,7 +426,8 @@ class MG_Media_Management {
 	 * @return string Modified output with updated URLs.
 	 */
 	public function replace_background_image_urls( string $html ): string {
-		return preg_replace_callback(
+		// CSS background-image url() references.
+		$html = preg_replace_callback(
 			'/url\((["\']?)(https?:\/\/[^"\')]+)(["\']?)\)/i',
 			function ( $matches ) {
 				$url         = $matches[2];
@@ -435,11 +436,82 @@ class MG_Media_Management {
 			},
 			$html
 		);
+
+		// Markup that writes media URLs straight into attributes instead of going
+		// through the attachment API. Page builders do this constantly, so the
+		// wp_get_attachment_* filters never see those URLs.
+		$html = preg_replace_callback(
+			'/\b(srcset|data-srcset|src|data-src)=(["\'])(.*?)\2/is',
+			function ( $matches ) {
+				$attr  = $matches[1];
+				$quote = $matches[2];
+				$parts = ( false !== stripos( $attr, 'srcset' ) ) ? explode( ',', $matches[3] ) : array( $matches[3] );
+
+				foreach ( $parts as $i => $part ) {
+					$candidate = trim( $part );
+					if ( '' === $candidate ) {
+						continue;
+					}
+
+					// srcset candidates are "<url> <descriptor>".
+					$bits       = preg_split( '/\s+/', $candidate, 2 );
+					$url        = $bits[0];
+					$descriptor = isset( $bits[1] ) ? ' ' . $bits[1] : '';
+
+					if ( ! $this->is_local_media_url( $url ) ) {
+						continue;
+					}
+
+					$parts[ $i ] = $this->esc_url_preserve_auth( $this->get_remote_or_local_url( $url ) ) . $descriptor;
+				}
+
+				return $attr . '=' . $quote . implode( ', ', $parts ) . $quote;
+			},
+			$html
+		);
+
+		return $html;
+	}
+
+	/**
+	 * Whether a URL points at a media file inside this site's uploads directory.
+	 *
+	 * Deliberately narrow: same host as the site, path under the uploads base,
+	 * and a media file extension. That keeps script/stylesheet attributes out of
+	 * the rewrite even when they are served from uploads, as bundlers often do.
+	 *
+	 * @param string $url The URL to test.
+	 *
+	 * @return bool
+	 */
+	protected function is_local_media_url( string $url ): bool {
+		if ( ! preg_match( '#^https?://#i', $url ) ) {
+			return false;
+		}
+
+		$uploads = wp_upload_dir();
+		$baseurl = $uploads['baseurl'] ?? '';
+		if ( '' === $baseurl ) {
+			return false;
+		}
+
+		$base_path = (string) wp_parse_url( $baseurl, PHP_URL_PATH );
+		$url_path  = (string) wp_parse_url( $url, PHP_URL_PATH );
+
+		if ( '' === $base_path || 0 !== strpos( $url_path, $base_path ) ) {
+			return false;
+		}
+
+		if ( (string) wp_parse_url( $url, PHP_URL_HOST ) !== (string) wp_parse_url( home_url(), PHP_URL_HOST ) ) {
+			return false;
+		}
+
+		return (bool) preg_match( '/\.(?:png|jpe?g|gif|webp|avif|svg|bmp|ico|tiff?)$/i', $url_path );
 	}
 }
 
 add_action(
-	'muplugins_loaded',
+	'plugins_loaded',
 	function () {
 		( new MG_Media_Management() )->init();
 	}
